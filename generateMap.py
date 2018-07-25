@@ -12,7 +12,7 @@ import queue
 # the the rest with 0's
 # However this might be harder to scale to having clustering of numbers
 N = 200
-p = .5
+p = .4
 c = 1 # cluster
 map = []
 
@@ -35,6 +35,8 @@ def RandomPure():
         map.append(row)
     print(num0)
     print(num1)
+
+
 
 # loops through the map row by row starting in the top left corner
 # at each index assigns a 0 or 1 determined by a bernoilli random variable
@@ -62,55 +64,6 @@ def RandomIterative():
                 num0 -= 1
                 #print(0)
         map.append(row)
-
-
-
-# clustering can be controlled;
-# c = 1 -> same as RandomPure, increaseing c -> more clustering
-def ClusterPure():
-    global map
-    map = []
-    num0 = 0
-    num1 = 0
-    P = p
-    for i in range(N):
-        row = []
-        prev = -1
-        for j in range(N):
-            # probaility weight based on an exponential function f(p,c) = p^1/c
-            # higher c -> higher f
-            # f(0, c) = 0,  f(1, c) = 1  This condition must hold for any f
-            if(i == 0):
-                if(prev == 1):
-                    P = p**(1/c)
-                if(prev == 0):
-                    P = 1 - (1-p)**(1/c)
-            # lots of boundary conditions
-            else:
-                if(j == 0):
-                    if(map[i-1][j] == 1):
-                        P = p**(1/c)
-                    if(map[i-1][j] == 0):
-                        P = 1 - (1-p)**(1/c)
-                else:
-                    if(map[i-1][j] == 1 and prev == 1):
-                        P = p**(1/c)
-                    if(map[i-1][j] == 0 and prev == 0):
-                        P = 1 - (1-p)**(1/c)
-
-            #print(P)
-            rand = random.uniform(0, 1) # generate random number
-            if(rand < P):
-                row.append(1)
-                num1 += 1
-                prev = 1
-            else:
-                row.append(0)
-                num0 += 1
-                prev = 0
-        map.append(row)
-    print(num0)
-    print(num1)
 
 
 
@@ -163,6 +116,57 @@ def ClusterIterative():
             else:
                 row.append(0)
                 num0 -= 1
+                prev = 0
+        map.append(row)
+    print(num0)
+    print(num1)
+
+
+
+# clustering can be controlled;
+# c = 1 -> same as RandomPure, increaseing c -> more clustering
+# as c increases variance of ratio of 0's to 1's increses
+# at very high c this becomes a big problem
+def ClusterPure():
+    global map
+    map = []
+    num0 = 0
+    num1 = 0
+    P = p
+    for i in range(N):
+        row = []
+        prev = -1
+        for j in range(N):
+            # probaility weight based on an exponential function f(p,c) = p^1/c
+            # higher c -> higher f
+            # f(0, c) = 0,  f(1, c) = 1  This condition must hold for any f
+            if(i == 0):
+                if(prev == 1):
+                    P = p**(1/c)
+                if(prev == 0):
+                    P = 1 - (1-p)**(1/c)
+            # lots of boundary conditions
+            else:
+                if(j == 0):
+                    if(map[i-1][j] == 1):
+                        P = p**(1/c)
+                    if(map[i-1][j] == 0):
+                        P = 1 - (1-p)**(1/c)
+                else:
+                    if(map[i-1][j] == 1 and prev == 1):
+                        P = p**(1/c)
+                    if(map[i-1][j] == 0 and prev == 0):
+                        P = 1 - (1-p)**(1/c)
+
+            #print(P)
+            rand = random.uniform(0, 1) # generate random number
+            if(rand < P):
+                row.append(1)
+                num1 += 1
+                prev = 1
+            else:
+                row.append(0)
+                num0 += 1
                 prev = 0
         map.append(row)
     print(num0)
@@ -233,9 +237,31 @@ def ClusterFloodFill():
 
 
 
-#
-#TODO: def RandomShuffle():
+# starts with a list of indexes 0 to N^2-1, shuffles the list into random order
+# these represent the idexes of map stored in row major order
+# set the first num0 indexes to 0, the rest to 1
+# ensures quota is filled
+def RandomShuffle():
+    global map
+    map =  [[-1 for x in range(N)] for y in range(N)]
+    idx = []
+    for i in range(N*N):
+        idx.append(i)
+    # sort idx
+    # InsertionShuffle: CS 473 UIUC Lecture 1
+    for i in range(N*N):
+        rand = random.randint(0, i)
+        temp = idx[i]
+        idx[i] = idx[rand]
+        idx[rand] = temp
 
+    for i in range(N*N):
+        y = math.floor(idx[i]/N)
+        x = idx[i] % N
+        if(i < N*N*p):
+            map[y][x] = 1
+        else:
+            map[y][x] = 0
 
 
 
@@ -258,9 +284,10 @@ def numNeighbors(): # checks number of differnet neighbors
 
 #RandomPure()
 #RandomIterative()
-ClusterPure()
+#ClusterPure()
 #ClusterIterative()
 #ClusterFloodFill()
+RandomShuffle()
 numNeighbors()
 
 
