@@ -12,8 +12,8 @@ import queue
 # the the rest with 0's
 # However this might be harder to scale to having clustering of numbers
 N = 200
-p = .4
-c = 1 # cluster
+p = .6
+c = 8 # cluster
 map = []
 
 # standard random map
@@ -245,8 +245,9 @@ def RandomShuffle():
     global map
     map =  [[-1 for x in range(N)] for y in range(N)]
     idx = []
-    for i in range(N*N):
-        idx.append(i)
+    for i in range(N):
+        for j in range(N):
+            idx.append([j, i])
     # sort idx
     # InsertionShuffle: CS 473 UIUC Lecture 1
     for i in range(N*N):
@@ -256,12 +257,86 @@ def RandomShuffle():
         idx[rand] = temp
 
     for i in range(N*N):
-        y = math.floor(idx[i]/N)
-        x = idx[i] % N
+        x = idx[i][0]
+        y = idx[i][1]
         if(i < N*N*p):
             map[y][x] = 1
         else:
             map[y][x] = 0
+
+
+
+# c = 1 does not make this the same as RandomShuffle
+def RandomShuffleCluster():
+    global map
+    # ideal function for P = f(p, c)
+    # c = 1 -> f = 0
+    # as c -> inf f slowly -> 1
+    # f(p, c) = 1 - (1-p)^((c-1)/100)) works (10 is arbitrary, the higher the number
+    # in the denomiator of the exponent, the slower the increase of f with c)
+    # Very open to experimentation on this
+    P = 1 - (1-p)**((c-1)/10)
+    # if this number gets high, map is usually filled in one floodfill
+    num1 = N*N*p
+    q = queue.Queue()
+    map =  [[0 for x in range(N)] for y in range(N)]
+    idx = []
+    for i in range(N):
+        for j in range(N):
+            idx.append([j, i])
+    # sort idx
+    # InsertionShuffle: CS 473 UIUC Lecture 1
+    for i in range(N*N):  # could speed this up? only need num1 < N*N
+        rand = random.randint(0, i)
+        temp = idx[i]
+        idx[i] = idx[rand]
+        idx[rand] = temp
+
+    print(num1)
+    for i in range(N*N):
+        if(num1 <= 0):
+            print(i)
+            break;
+        x = idx[i][0]
+        y = idx[i][1]
+        if(num1 > 0 and map[y][x] == 0):
+            q.put([x, y])
+            while(not q.empty() and num1 > 0):
+                point = q.get()                  # get point on map from queue
+                x = point[0]
+                y = point[1]
+
+                # update count and probability
+                # unlike other random map generators, not determining if a
+                # 0 or a 1 should be placed, instead determining if floodfill
+                # should be continued, in this case flood fill is done for
+                # only the 1's with randomly selected starting points, the rest
+                # is filled in with 0's
+                if(map[y][x] == 0):
+                    map[y][x] = 1
+                    num1 -= 1
+                    # recurse
+                    rand = random.uniform(0, 1)
+                    if(rand < P and y < N-1):
+                        if(map[y+1][x] == 0):
+                            q.put([x, y+1])
+
+                    rand = random.uniform(0, 1)
+                    if(rand < P and y > 0):
+                        if(map[y-1][x] == 0):
+                            q.put([x, y-1])
+
+                    rand = random.uniform(0, 1)
+                    if(rand < P and x < N-1):
+                        if(map[y][x+1] == 0):
+                            q.put([x+1, y])
+
+                    rand = random.uniform(0, 1)
+                    if(rand < P and x > 0):
+                        if(map[y][x-1] == 0):
+                            q.put([x-1, y])
+    print(num1)
+
 
 
 
@@ -287,7 +362,8 @@ def numNeighbors(): # checks number of differnet neighbors
 #ClusterPure()
 #ClusterIterative()
 #ClusterFloodFill()
-RandomShuffle()
+#RandomShuffle()
+RandomShuffleCluster()
 numNeighbors()
 
 
@@ -297,5 +373,5 @@ x, y = np.meshgrid(x, y)
 cMap = colors.ListedColormap(['blue', 'orange'])
 
 plt.pcolormesh(x, y, map, cmap = cMap)
-#plt.colorbar() #need a colorbar to show the intensity scale
-plt.show() #boom
+plt.colorbar()
+plt.show()
