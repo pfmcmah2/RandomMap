@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 from matplotlib import colors
 import numpy as np
 import math
-import scipy.stats
 import random
 import queue
 
@@ -17,9 +16,8 @@ c = 8 # cluster
 map = []
 
 # standard random map
-def RandomPure():
-    global map
-    map = []
+def RandomPure(N, p, c):
+    Map = []
     num0 = 0
     num1 = 0
     for i in range(N):
@@ -32,9 +30,10 @@ def RandomPure():
             else:
                 row.append(0)
                 num0 += 1
-        map.append(row)
-    print(num0)
-    print(num1)
+        Map.append(row)
+    return Map
+    #print(num0)
+    #print(num1)
 
 
 
@@ -42,9 +41,8 @@ def RandomPure():
 # at each index assigns a 0 or 1 determined by a bernoilli random variable
 # with probability dependent on number of 0's and 1's needed to fill the quota
 # ensures the quota is filled exactly
-def RandomIterative():
-    global map
-    map = []
+def RandomIterative(N, p, c):
+    Map = []
     num0 = N*N*(1-p)    # quota of 0's
     num1 = N*N*p       # quota of 1's
     for i in range(N):
@@ -63,19 +61,19 @@ def RandomIterative():
                 row.append(0)
                 num0 -= 1
                 #print(0)
-        map.append(row)
+        Map.append(row)
+    return Map
 
 
 
 # ensures quota is filled exactly
 # clustering can be controlled;
 # c = 1 -> same as RandomIterative, increaseing c -> more clustering
-def ClusterIterative():
+def ClusterIterative(N, p, c):
     # same as generateRandomMap but prioritizes same as neighbors
     # not truly random, tends to have minority cluster around top left
     # this is because
-    global map
-    map = []
+    Map = []
     num0 = N*N*(1-p)    # quota of 0's
     num1 = N*N*p       # quota of 1's
     for i in range(N):
@@ -97,14 +95,14 @@ def ClusterIterative():
             # lots of boundary conditions
             else:
                 if(j == 0):
-                    if(map[i-1][j] == 1):
+                    if(Map[i-1][j] == 1):
                         P = P**(1/c)
-                    if(map[i-1][j] == 0):
+                    if(Map[i-1][j] == 0):
                         P = 1 - (1-P)**(1/c)
                 else:
-                    if(map[i-1][j] == 1 and prev == 1):
+                    if(Map[i-1][j] == 1 and prev == 1):
                         P = P**(1/c)
-                    if(map[i-1][j] == 0 and prev == 0):
+                    if(Map[i-1][j] == 0 and prev == 0):
                         P = 1 - (1-P)**(1/c)
 
             #print(P)
@@ -117,9 +115,10 @@ def ClusterIterative():
                 row.append(0)
                 num0 -= 1
                 prev = 0
-        map.append(row)
-    print(num0)
-    print(num1)
+        Map.append(row)
+    #print(num0)
+    #print(num1)
+    return Map
 
 
 
@@ -127,9 +126,8 @@ def ClusterIterative():
 # c = 1 -> same as RandomPure, increaseing c -> more clustering
 # as c increases variance of ratio of 0's to 1's increses
 # at very high c this becomes a big problem
-def ClusterPure():
-    global map
-    map = []
+def ClusterPure(N, p, c):
+    Map = []
     num0 = 0
     num1 = 0
     P = p
@@ -148,14 +146,14 @@ def ClusterPure():
             # lots of boundary conditions
             else:
                 if(j == 0):
-                    if(map[i-1][j] == 1):
+                    if(Map[i-1][j] == 1):
                         P = p**(1/c)
-                    if(map[i-1][j] == 0):
+                    if(Map[i-1][j] == 0):
                         P = 1 - (1-p)**(1/c)
                 else:
-                    if(map[i-1][j] == 1 and prev == 1):
+                    if(Map[i-1][j] == 1 and prev == 1):
                         P = p**(1/c)
-                    if(map[i-1][j] == 0 and prev == 0):
+                    if(Map[i-1][j] == 0 and prev == 0):
                         P = 1 - (1-p)**(1/c)
 
             #print(P)
@@ -168,24 +166,24 @@ def ClusterPure():
                 row.append(0)
                 num0 += 1
                 prev = 0
-        map.append(row)
-    print(num0)
-    print(num1)
+        Map.append(row)
+    return Map
+    #print(num0)
+    #print(num1)
 
 
 
 # getting some /0 and complex number errors
 # also not creating good non-clustering maps
-def ClusterFloodFill():
-    global map
-    map =  [[-1 for x in range(N)] for y in range(N)]
+def ClusterFloodFill(N, p, c):
+    Map =  [[-1 for x in range(N)] for y in range(N)]
     q = queue.Queue()         # queue for flood fill
     num0 = N*N*(1-p)    # quota of 0's
     num1 = N*N*p        # quota of 1's
     #q.put([0,0])
     for i in range(N):
         for j in range(N):
-            if(map[i][j] == -1):
+            if(Map[i][j] == -1):
                 if(num0 + num1 > 0):
                     P = num1/(num0 + num1)      # local probability
                 rand = random.uniform(0, 1) # generate random number
@@ -197,7 +195,7 @@ def ClusterFloodFill():
                 q.put([i, j])
                 while(not q.empty()):
                     idx = q.get()                  # get index from queue
-                    map[idx[0]][idx[1]] = val      # set index of map to val
+                    Map[idx[0]][idx[1]] = val      # set index of map to val
                     # update count and probability
                     # unlike other random map generators, not determining if a
                     # 0 or a 1 should be placed, instead determining if floodfill
@@ -217,33 +215,32 @@ def ClusterFloodFill():
                     # recurse
                     rand = random.uniform(0, 1)
                     if(rand < P and i < N-1):
-                        if(map[i+1][j] == -1):
+                        if(Map[i+1][j] == -1):
                             q.put([i+1, j])
 
                     rand = random.uniform(0, 1)
                     if(rand < P and i > 0):
-                        if(map[i-1][j] == -1):
+                        if(Map[i-1][j] == -1):
                             q.put([i-1, j])
 
                     rand = random.uniform(0, 1)
                     if(rand < P and j < N-1):
-                        if(map[i][j+1] == -1):
+                        if(Map[i][j+1] == -1):
                             q.put([i, j+1])
 
                     rand = random.uniform(0, 1)
                     if(rand < P and j > 0):
-                        if(map[i][j-1] == -1):
+                        if(Map[i][j-1] == -1):
                             q.put([i, j-1])
-
+    return Map
 
 
 # starts with a list of indexes 0 to N^2-1, shuffles the list into random order
 # these represent the idexes of map stored in row major order
 # set the first num0 indexes to 0, the rest to 1
 # ensures quota is filled
-def RandomShuffle():
-    global map
-    map =  [[-1 for x in range(N)] for y in range(N)]
+def RandomShuffle(N, p, c):
+    Map =  [[-1 for x in range(N)] for y in range(N)]
     idx = []
     for i in range(N):
         for j in range(N):
@@ -260,15 +257,16 @@ def RandomShuffle():
         x = idx[i][0]
         y = idx[i][1]
         if(i < N*N*p):
-            map[y][x] = 1
+            Map[y][x] = 1
         else:
-            map[y][x] = 0
+            Map[y][x] = 0
+    return Map
+
 
 
 
 # c = 1 does not make this the same as RandomShuffle
-def RandomShuffleCluster():
-    global map
+def RandomShuffleCluster(N, p, c):
     # ideal function for P = f(p, c)
     # c = 1 -> f = 0
     # as c -> inf f slowly -> 1
@@ -279,7 +277,7 @@ def RandomShuffleCluster():
     # if this number gets high, map is usually filled in one floodfill
     num1 = N*N*p
     q = queue.Queue()
-    map =  [[0 for x in range(N)] for y in range(N)]
+    Map =  [[0 for x in range(N)] for y in range(N)]
     idx = []
     for i in range(N):
         for j in range(N):
@@ -292,14 +290,14 @@ def RandomShuffleCluster():
         idx[i] = idx[rand]
         idx[rand] = temp
 
-    print(num1)
+    #print(num1)
     for i in range(N*N):
         if(num1 <= 0):
-            print(i)
+            #print(i)
             break;
         x = idx[i][0]
         y = idx[i][1]
-        if(num1 > 0 and map[y][x] == 0):
+        if(num1 > 0 and Map[y][x] == 0):
             q.put([x, y])
             while(not q.empty() and num1 > 0):
                 point = q.get()                  # get point on map from queue
@@ -312,61 +310,60 @@ def RandomShuffleCluster():
                 # should be continued, in this case flood fill is done for
                 # only the 1's with randomly selected starting points, the rest
                 # is filled in with 0's
-                if(map[y][x] == 0):
-                    map[y][x] = 1
+                if(Map[y][x] == 0):
+                    Map[y][x] = 1
                     num1 -= 1
                     # recurse
                     rand = random.uniform(0, 1)
                     if(rand < P and y < N-1):
-                        if(map[y+1][x] == 0):
+                        if(Map[y+1][x] == 0):
                             q.put([x, y+1])
 
                     rand = random.uniform(0, 1)
                     if(rand < P and y > 0):
-                        if(map[y-1][x] == 0):
+                        if(Map[y-1][x] == 0):
                             q.put([x, y-1])
 
                     rand = random.uniform(0, 1)
                     if(rand < P and x < N-1):
-                        if(map[y][x+1] == 0):
+                        if(Map[y][x+1] == 0):
                             q.put([x+1, y])
 
                     rand = random.uniform(0, 1)
                     if(rand < P and x > 0):
-                        if(map[y][x-1] == 0):
+                        if(Map[y][x-1] == 0):
                             q.put([x-1, y])
-    print(num1)
+    return Map
 
 
 
-
-
-
-
-def numNeighbors(): # checks number of differnet neighbors
+# checks number of differnet neighbors
+def numNeighbors(Map):
     count = 0
     for i in range(1, N-1, 1):
         for j in range(1, N-1, 1):
-            if(map[i][j] == map[i-1][j]):
+            if(Map[i][j] == Map[i-1][j]):
                 count += 1
-            if(map[i][j] == map[i+1][j]):
+            if(Map[i][j] == Map[i+1][j]):
                 count += 1
-            if(map[i][j] == map[i][j-1]):
+            if(Map[i][j] == Map[i][j-1]):
                 count += 1
-            if(map[i][j] == map[i][j+1]):
+            if(Map[i][j] == Map[i][j+1]):
                 count += 1
     print(count/((N-2)*(N-2)*4))    # not sure what to call this, relates to clustering
 
-#RandomPure()
-#RandomIterative()
-#ClusterPure()
-#ClusterIterative()
-#ClusterFloodFill()
-#RandomShuffle()
-RandomShuffleCluster()
-numNeighbors()
 
 
+#map = RandomPure(N, p, c)
+#map = RandomIterative(N, p, c)
+#map = ClusterPure(N, p, c)
+#map = ClusterIterative(N, p, c)
+#map = ClusterFloodFill(N, p, c)
+#map = RandomShuffle(N, p, c)
+#map = RandomShuffleCluster(N, p, c)
+#numNeighbors(map)
+
+'''
 x = np.arange(0, N, 1)
 y = np.arange(0, N, 1)
 x, y = np.meshgrid(x, y)
@@ -375,3 +372,4 @@ cMap = colors.ListedColormap(['blue', 'orange'])
 plt.pcolormesh(x, y, map, cmap = cMap)
 plt.colorbar()
 plt.show()
+'''
