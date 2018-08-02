@@ -5,11 +5,7 @@ import math
 import random
 import queue
 
-# creates an NxN array of 1's and 0's with an expected percent of p 1's
 
-# another method is to pick array indexes at random and place 1's until quota is filled
-# the the rest with 0's
-# However this might be harder to scale to having clustering of numbers
 N = 200
 p = .6
 c = 8 # cluster
@@ -265,7 +261,9 @@ def RandomShuffle(N, p, c):
 
 
 
-# c = 1 does not make this the same as RandomShuffle
+# floodfill starting at randomly selected points in the graph
+# c = 1 -> same as RandomShuffle
+# Fills exact quota, clusters well, doesn't favor specific area of graph
 def RandomShuffleCluster(N, p, c):
     # ideal function for P = f(p, c)
     # c = 1 -> f = 0
