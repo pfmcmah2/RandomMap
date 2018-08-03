@@ -271,7 +271,7 @@ def RandomShuffleControlledCluster(N, pA, pB, c, s):
     return Map
 
 #map = RandomShuffleCluster(N, pA, pB, c)
-map = RandomShuffleControlledCluster(N, pA, pB, c, s)
+#map = RandomShuffleControlledCluster(N, pA, pB, c, s)
 
 '''x = np.arange(0, N, 1)
 y = np.arange(0, N, 1)
@@ -280,5 +280,4 @@ cMap = colors.ListedColormap(['blue', 'white', 'red'])
 
 plt.pcolormesh(x, y, map, cmap = cMap)
 plt.colorbar()
-plt.show()
-'''
+plt.show()'''
