@@ -25,7 +25,7 @@ import openMap as oM
 # creating good test maps is likely a more difficult task than creating fair groups
 
 
-N = 100
+N = 200
 G = 20
 groupSize = []
 queues = []
@@ -215,14 +215,28 @@ for y in range(N):
         if(voteMap[y][x] != 0): # if point on map is populated
             groupPopulation[idx] += 1
 
+# count groups won
+a = 0
+b = 0
+for i in range(G):
+    if(voteCount[i] > 0):
+        a += 1
+    if(voteCount[i] < 0):
+        b += 1
+
 print('groupSize = ', groupSize)
 print('groupPopulation = ', groupPopulation)
 print('voteCount = ', voteCount)
+print('Red wins: ', b, '\nBlue wins: ', a)
 
 x = np.arange(0, N, 1)
 y = np.arange(0, N, 1)
 x, y = np.meshgrid(x, y)
-#cMap = colors.ListedColormap(['red', 'orange', 'yellow', 'green', 'blue'])
+cMap = colors.ListedColormap(['red', 'white', 'blue'])
+
+plt.pcolormesh(x, y, voteMap, cmap = cMap)
+plt.colorbar()
+plt.show()
 
 plt.pcolormesh(x, y, map)#, cmap = cMap)
 plt.colorbar()
