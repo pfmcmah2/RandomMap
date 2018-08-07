@@ -24,6 +24,14 @@ import openMap as oM
 # clusteing irl might be higher than I had thought
 # creating good test maps is likely a more difficult task than creating fair groups
 
+# NOTE: BRFS is by far the best method for creating random groups so far 8/7/18
+# Very little difference in results for maxSkip = 100 and 500
+# Better off increasing number of test group maps generated with lower maxSkip
+
+# Map is visulaized in the following way: (0,0) (0,1) (0,2)
+# (0,0) is top left                       (1,0) (1,1) (1,2)
+# (2,2) is bottom right                   (2,0) (2,1) (2,2)
+
 
 N = 100
 G = 20
@@ -240,9 +248,11 @@ def BalancedRandomFloodfill(N, G, voteMap):
 # goes until all queues have been emptied
 # skips expansion if group is larger than average
 # only skips a certain number of times in a row to avoid hang
-def BalancedRandomFloodfillSkip(N, G, voteMap):
+def BalancedRandomFloodfillSkip(N, G, maxSkip, voteMap):
     # initialize
-    maxSkip = 3     # max number of turns than can be skipped for a group
+    # TODO: Test Different maxSkip values increasing maxSkip should decrease stdev of group size
+    # Not sure if there is a way to guarentee an upper bound on stdev size
+    # maxSkip;  max number of turns than can be skipped for a group
     skip = [0 for i in range(G)]    # number of turns which have been skipped for each
     queues = []
     for i in range(G):
@@ -344,9 +354,117 @@ def BalancedRandomFloodfillSkip(N, G, voteMap):
         i = (i + 1)%G
     return map
 
-# TODO: Fix this
-'''def RandomRectangular(N, G, pA, pB, voteMap):
-    # TODO: modify this to set to G-1, last group is what's left
+# same as BRFS but includes group size in output
+# Output[0] = map,   Output[1] = groupSize
+def BRFS_G(N, G, maxSkip, voteMap):
+    # initialize
+    # TODO: Test Different maxSkip values increasing maxSkip should decrease stdev of group size
+    # Not sure if there is a way to guarentee an upper bound on stdev size
+    # maxSkip;  max number of turns than can be skipped for a group
+    skip = [0 for i in range(G)]    # number of turns which have been skipped for each
+    groupSize = [1 for i in range(G)]   # had to change initialization for iterative method
+    queues = []
+    for i in range(G):
+        #val = round(numSquares/(G - i))
+        #numSquares -= val
+        q = queue.Queue()
+        queues.append(q)
+
+    # assign starting location for each group
+    startLocation = []      # used to check repeat start locations
+    for i in range(G):
+        repeat = True       # detect repeated start points
+        # expected number of tries = SUM(i = 0 to G - 1) (N^2 - 1)/N^2 ~ G for N >> G
+        # expected running time = SUM(i = 0 to G - 1) (i + 1)(N^2 - 1)/N^2 ~ G^2 for N >> G
+        while(repeat):
+            x = random.randint(0, N-1)
+            y = random.randint(0, N-1)
+            repeat = False
+            for j in range(i):
+                if(x == startLocation[j][0] and y == startLocation[j][1]):
+                    repeat = True
+        startLocation.append([x, y])
+        queues[i].put([x, y])
+
+    map = [[-1 for x in range(N)] for y in range(N)]
+    done = [0 for x in range(G)] # when queue is emptied mark as done
+    numDone = 0 # number of goups that are finished being filled
+    i = 0    # current group
+    newVoters = 0   # number of new voters in each round of expansion
+    totalVoters = G # total number of voters, updated after each round
+    # check if start point is populated, if not fix values
+    for i in range(G):
+        if(voteMap[startLocation[i][1]][startLocation[i][0]] == 0):
+            totalVoters -= 1
+            groupSize[i] = 0
+
+    while(numDone < G):
+        if(i == 0):
+            # compare size of each group to total voters at beginning of the round
+            # Otherwise this would give an advantage to higher index groups
+            totalVoters += newVoters
+            newVoters = 0
+
+        if(queues[i].empty()):
+            if(done[i] == 0):
+                done[i] = 1
+                numDone += 1
+        else:
+            expandFlag = True    # is the group allowed to expand this round
+            if(groupSize[i] > totalVoters/G):
+                skip[i] += 1    # increment skip count
+                if(skip[i] == maxSkip): # if max number of skips reach
+                    skip[i] = 0 # reset count and allow to expand
+                else:
+                    expandFlag = False
+
+            if(expandFlag):
+                point = queues[i].get()
+                x = point[0]
+                y = point[1]
+
+
+                # fill in surrounding elements
+                # filling in elements when added to queue, rather than when
+                if(y < N - 1):
+                    if(map[y+1][x] == -1):
+                        map[y+1][x] = i
+                        queues[i].put([x, y+1])
+                        if(voteMap[y+1][x] != 0): # if point on map is populted inc count
+                            groupSize[i] += 1
+                            newVoters += 1
+
+                if(y > 0):
+                    if(map[y-1][x] == -1):
+                        map[y-1][x] = i
+                        queues[i].put([x, y-1])
+                        if(voteMap[y-1][x] != 0):
+                            groupSize[i] += 1
+                            newVoters += 1
+
+                if(x < N - 1):
+                    if(map[y][x+1] == -1):
+                        map[y][x+1] = i
+                        queues[i].put([x+1, y])
+                        if(voteMap[y][x+1] != 0):
+                            groupSize[i] += 1
+                            newVoters += 1
+
+                if(x > 0):
+                    if(map[y][x-1] == -1):
+                        map[y][x-1] = i
+                        queues[i].put([x-1, y])
+                        if(voteMap[y][x-1] != 0):
+                            groupSize[i] += 1
+                            newVoters += 1
+
+        # increment group number
+        i = (i + 1)%G
+    return [map, groupSize]
+
+# NOT WORKING
+def StructuedFloodfill(N, G, pA, pB, voteMap):
+    # modify this to set to G-1, last group is what's left
     map = [[-1 for x in range(N)] for y in range(N)]
 
     # List of starting locations (top left corner) of new groups
@@ -359,8 +477,9 @@ def BalancedRandomFloodfillSkip(N, G, voteMap):
         print(i)
 
         # use start point closest to top, tie breaker closest to left
+        # could change this to closest to (0,0)
         # should be a better way to to this testing below
-        startPoint = [-1, -1]
+        '''startPoint = [-1, -1]
         found = False
         for y in range(N):
             for x in range(N):
@@ -371,11 +490,7 @@ def BalancedRandomFloodfillSkip(N, G, voteMap):
                     break
             if(found):
                 break
-        print('startPoint = ', startPoint)
-        # TODO: make greedy prediciton based on startPoint if there will be enough
-        # people in the group created by standard expansion i.e. (N-x)*(N-y)*p > groupSize
-        # if not
-
+        print('startPoint = ', startPoint)'''
 
 
         ###startPoint = [N, N]
@@ -385,82 +500,85 @@ def BalancedRandomFloodfillSkip(N, G, voteMap):
         ###        startPoint = j
         ###startList.remove(startPoint)
 
-        # alternate between expanding right and down adding on a 1xA or Ax1 rectangle
-        # where A is chosen to preserve the shape of the group as a rectangle
-        # until obstructions are encountered
 
-        h = startPoint[1]       # y value for horizontal rectangle
-        v = startPoint[0]       # x value for vertical rectangle
-        hRect = [startPoint[0]] # list of x values included in the horizontal rectangle
-        vRect = [startPoint[1]] # list of y values included in the vertical rectangle
+        ### ALTERNATE startpoint method
+        # 0th group top left
+        # 1st group top right
+        # 2nd group bottom right
+        # 3rd group bottom left
+        # start over with 0th
 
-        # 0 = add vertical rectangle,   1 = add horizontal
-        mode = 0
-        # current population of group
-        population = 0
-        # target population of group
-        groupSize = quota/(G - i)
-        while(population < groupSize):
-            if(len(hRect) == 0 and len(vRect) == 0):
+        # used to change direction of x and y in search for first available start point
+        # i even -> left to right. i odd -> right to left
+        if(i%2 == 0):
+            xOffset = 0
+        else:
+            xOffset = N-1
+        # 0th, 1st groups -> top to bottom,
+        if(i%4 > 1):
+            yOffset = N-1
+        else:
+            yOffset = 0
+
+
+
+        startPoint = [-1, -1]
+        found = False
+        for y in range(N):
+            for x in range(N):
+                if(map[abs(yOffset-y)][abs(xOffset-x)] == -1):
+                    startPoint = [abs(xOffset-x), abs(yOffset-y)]
+                    map[abs(yOffset-y)][abs(xOffset-x)] = i   # mark group on map
+                    found = True
+                    break
+            if(found):
                 break
+        print('startPoint = ', startPoint)
 
-            # add vertical
-            count = 0         # number of new voters
-            if(mode == 0):
-                if(v < N - 1):
-                    v += 1
-                    for j in vRect:
-                        if(map[j][v] == -1):
-                            if(voteMap[j][v] != 0): # if populated update population
-                                count += 1
-                            if(j == h):     # expand front of horizontal rect if possible
-                                hRect.append(v)
-                        else:
-                            vRect.remove(j)     # obstruction found can't expand in this direction
-                    # can go over target size if it makes population closer to target
-                    # goal is to minimize |population - groupSize|
-                    if(groupSize - population > population + count - groupSize):
-                        # add new elements to group
-                        for j in vRect:
-                            map[j][v] = i   # mark element as group i
-                    else:
-                        # group is smaller than target but closer to target than it
-                        # would have been had the new elemnts been added
-                        break
-                    population += count
 
-                else:
-                    vRect = []
+        # do a standard floodfill until population = groupSize
+        groupSize = quota/(G - i)
+        quota -= groupSize
+        population = 1
 
-            if(mode == 1):
-                if(h < N - 1):
-                    h += 1
-                    for j in hRect:
-                        if(map[h][j] == -1):
-                            if(voteMap[h][j] != 0):
-                                count += 1
-                            if(j == v):     # expand front of vertical rect if possible
-                                vRect.append(h)
-                        else:
-                            hRect.remove(j)     # obstruction found can't expand in this direction
-                    # can go over target size if it makes population closer to target
-                    # goal is to minimize |population - groupSize|
-                    if(groupSize - population > population + count - groupSize):
-                        # add new elements to group
-                        for j in hRect:
-                            map[h][j] = i   # mark element as group i
-                    else:
-                        break
-                    population += count
-                else:
-                    hRect = []
+        q = queue.Queue()
+        q.put(startPoint)
+        while(population < groupSize):
+            point = q.get()
+            x = point[0]
+            y = point[1]
 
-            mode = (mode+1)%2   # change mode
-        # update quota
-        quota -= population
+            if(population < groupSize and y < N-1):
+                if(map[y+1][x] == -1):
+                    map[y+1][x] = i
+                    q.put([x, y+1])
+                    if(voteMap[y+1][x] != 0):
+                        population += 1
+
+            if(population < groupSize and y > 0):
+                if(map[y-1][x] == -1):
+                    map[y-1][x] = i
+                    q.put([x, y-1])
+                    if(voteMap[y-1][x] != 0):
+                        population += 1
+
+            if(population < groupSize and x < N-1):
+                if(map[y][x+1] == -1):
+                    map[y][x+1] = i
+                    q.put([x+1, y])
+                    if(voteMap[y][x+1] != 0):
+                        population += 1
+
+            if(population < groupSize and x > 0):
+                if(map[y][x-1] == -1):
+                    map[y][x-1] = i
+                    q.put([x-1, y])
+                    if(voteMap[y][x-1] != 0):
+                        population += 1
 
     # last group takes whatever is left
-    return map'''
+    return map
+
 
 # most simple implementation I can think of
 # linear "snaking" traversal, fills quota extactly
@@ -506,16 +624,31 @@ def RandomLinear(N, G, pA, pB, voteMap):
 
 
 
-
+# runs BalancedRandomFloodfillSkip I times and takes the result with the lowest
+# standard deviation for group size
+def IterativeBRFS(I, N, G, maxSkip, voteMap):
+    STD = N*N
+    map = []
+    for i in range(I):
+        tempMap = BRFS_G(N, G, maxSkip, voteMap)
+        print(tempMap[1])
+        tempSTD = np.std(tempMap[1])    # take stdev of groupSize
+        print(tempSTD)
+        if(tempSTD < STD):
+            STD = tempSTD
+            map = tempMap[0]
+    return map
 
 
 
 
 #map = PureRandomFloodfill(N, G)
 #map = BalancedRandomFloodfill(N, G, voteMap)
-map = BalancedRandomFloodfillSkip(N, G, voteMap)
-#map = RandomRectangular(N, G, pA, pB, voteMap)
+#map = BalancedRandomFloodfillSkip(N, G, 100, voteMap)
+#map = StructuedFloodfill(N, G, pA, pB, voteMap)
 #map = RandomLinear(N, G, pA, pB, voteMap)
+
+map = IterativeBRFS(100, N, G, 5, voteMap)
 
 # count votes
 voteCount = [0 for x in range(G)]
