@@ -6,7 +6,7 @@ import random
 import queue
 
 # creates an NxN map filled with 1's -1's and 0's
-# for the sake of variable names 1 voters will be called A's and 0 voters B's
+# for the sake of variable names 1 voters will be called A's and -1 voters B's
 
 #TODO:  Next steps, multiple voters in one element, keep track of number of voters
 #       as well as vote balance

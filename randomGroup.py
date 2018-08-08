@@ -6,6 +6,8 @@ import random
 import queue
 import openMap as oM
 
+# for the sake of variable names 1 voters will be called A's and -1 voters B's
+# A's have color blue, B's have color red
 
 # Fills an NxN map in with G equal size groups
 # Picks G start locations from map at random
@@ -37,7 +39,7 @@ N = 100
 G = 20
 groupSize = []
 numSquares = N*N
-pA = .4
+pA = .2
 pB = .4
 
 
@@ -501,41 +503,6 @@ def StructuedFloodfill(N, G, pA, pB, voteMap):
         ###startList.remove(startPoint)
 
 
-        ### ALTERNATE startpoint method
-        # 0th group top left
-        # 1st group top right
-        # 2nd group bottom right
-        # 3rd group bottom left
-        # start over with 0th
-
-        # used to change direction of x and y in search for first available start point
-        # i even -> left to right. i odd -> right to left
-        if(i%2 == 0):
-            xOffset = 0
-        else:
-            xOffset = N-1
-        # 0th, 1st groups -> top to bottom,
-        if(i%4 > 1):
-            yOffset = N-1
-        else:
-            yOffset = 0
-
-
-
-        startPoint = [-1, -1]
-        found = False
-        for y in range(N):
-            for x in range(N):
-                if(map[abs(yOffset-y)][abs(xOffset-x)] == -1):
-                    startPoint = [abs(xOffset-x), abs(yOffset-y)]
-                    map[abs(yOffset-y)][abs(xOffset-x)] = i   # mark group on map
-                    found = True
-                    break
-            if(found):
-                break
-        print('startPoint = ', startPoint)
-
-
         # do a standard floodfill until population = groupSize
         groupSize = quota/(G - i)
         quota -= groupSize
@@ -640,13 +607,179 @@ def IterativeBRFS(I, N, G, maxSkip, voteMap):
     return map
 
 
+# same skip method as BRFS
+# shapes groups to favor party A (1 voters)
+# this is done by creating grops in which A wins by a slim margin
+# and in which B wins by a large margin in order to cluster all B voters into
+# a few groups
+# TODO: work on this
+def BiasedFloodfill(N, G, pA, pB, maxSkip, voteMap):
+    # initialize
+    targetGroupSize = N*N*(pA+pB)/G
+    # Not sure if there is a way to guarentee an upper bound on stdev size
+    # maxSkip;  max number of turns than can be skipped for a group
+    skip = [0 for i in range(G)]    # number of turns which have been skipped for each
+    groupSize = [1 for i in range(G)]   # had to change initialization for iterative method
+    voteBalance = [0 for i in range(G)]
+    queues = []
+    for i in range(G):
+        #val = round(numSquares/(G - i))
+        #numSquares -= val
+        q = queue.Queue()
+        queues.append(q)
 
+    # assign starting location for each group
+    startLocation = []      # used to check repeat start locations
+    for i in range(G):
+        repeat = True       # detect repeated start points
+        # expected number of tries = SUM(i = 0 to G - 1) (N^2 - 1)/N^2 ~ G for N >> G
+        # expected running time = SUM(i = 0 to G - 1) (i + 1)(N^2 - 1)/N^2 ~ G^2 for N >> G
+        while(repeat):
+            x = random.randint(0, N-1)
+            y = random.randint(0, N-1)
+            repeat = False
+            for j in range(i):
+                if(x == startLocation[j][0] and y == startLocation[j][1]):
+                    repeat = True
+        startLocation.append([x, y])
+        queues[i].put([x, y])
+
+    map = [[-1 for x in range(N)] for y in range(N)]
+    done = [0 for x in range(G)] # when queue is emptied mark as done
+    numDone = 0 # number of goups that are finished being filled
+    i = 0    # current group
+    newVoters = 0   # number of new voters in each round of expansion
+    totalVoters = G # total number of voters, updated after each round
+    # check if start point is populated, if not fix values
+    for i in range(G):
+        if(voteMap[startLocation[i][1]][startLocation[i][0]] == 0):
+            totalVoters -= 1
+            groupSize[i] = 0
+
+    while(numDone < G):
+        if(i == 0):
+            # compare size of each group to total voters at beginning of the round
+            # Otherwise this would give an advantage to higher index groups
+            totalVoters += newVoters
+            newVoters = 0
+
+        if(queues[i].empty()):
+            if(done[i] == 0):
+                done[i] = 1
+                numDone += 1
+        else:
+            expandFlag = True    # is the group allowed to expand this round
+            if(groupSize[i] > totalVoters/G):
+                skip[i] += 1    # increment skip count
+                if(skip[i] == maxSkip): # if max number of skips reach
+                    skip[i] = 0 # reset count and allow to expand
+                else:
+                    expandFlag = False
+
+            if(expandFlag):
+                point = queues[i].get()
+                x = point[0]
+                y = point[1]
+
+                # let the groups expand naturally initially
+                # for now, just focus on B donminated groups
+                if(groupSize[i] < targetGroupSize/10 or voteBalance[i] >= 0):
+                    # fill in surrounding elements
+                    # filling in elements when added to queue, rather than when
+
+                    skipFlag = True     # if over target size only allow one expand
+
+                    if(y < N - 1 and skipFlag):
+                        if(map[y+1][x] == -1):
+                            if(groupSize[i] > targetGroupSize):
+                                skipFlag = False
+                            map[y+1][x] = i
+                            queues[i].put([x, y+1])
+                            if(voteMap[y+1][x] != 0): # if point on map is populted inc count
+                                groupSize[i] += 1
+                                voteBalance[i] += voteMap[y+1][x]
+                                newVoters += 1
+
+                    if(y > 0 and skipFlag):
+                        if(map[y-1][x] == -1):
+                            if(groupSize[i] > targetGroupSize):
+                                skipFlag = False
+                            map[y-1][x] = i
+                            queues[i].put([x, y-1])
+                            if(voteMap[y-1][x] != 0):
+                                groupSize[i] += 1
+                                voteBalance[i] += voteMap[y-1][x]
+                                newVoters += 1
+
+                    if(x < N - 1 and skipFlag):
+                        if(map[y][x+1] == -1):
+                            if(groupSize[i] > targetGroupSize):
+                                skipFlag = False
+                            map[y][x+1] = i
+                            queues[i].put([x+1, y])
+                            if(voteMap[y][x+1] != 0):
+                                groupSize[i] += 1
+                                voteBalance[i] += voteMap[y][x+1]
+                                newVoters += 1
+
+                    if(x > 0 and skipFlag):
+                        if(map[y][x-1] == -1):
+                            if(groupSize[i] > targetGroupSize):
+                                skipFlag = False
+                            map[y][x-1] = i
+                            queues[i].put([x-1, y])
+                            if(voteMap[y][x-1] != 0):
+                                groupSize[i] += 1
+                                voteBalance[i] += voteMap[y][x-1]
+                                newVoters += 1
+
+                else:
+                    neighbors = []  # holds vote and direction of neighbors
+                    if(y < N - 1):
+                        if(map[y+1][x] == -1):
+                            neighbors.append([voteMap[y+1][x], [0, 1]])
+
+                    if(y > 0):
+                        if(map[y-1][x] == -1):
+                            neighbors.append([voteMap[y-1][x], [0, -1]])
+
+                    if(x < N - 1):
+                        if(map[y][x+1] == -1):
+                            neighbors.append([voteMap[y][x+1], [1, 0]])
+
+                    if(x > 0):
+                        if(map[y][x-1] == -1):
+                            neighbors.append([voteMap[y][x-1], [-1, 0]])
+
+                    neighbors.sort() # put 1's last
+                    # expand
+                    for j in range(len(neighbors)):
+                        if(neighbors[j][0] != 1):
+                            # apply direction of expand
+                            Y = y + neighbors[j][1][1]
+                            X = x + neighbors[j][1][0]
+                            map[Y][X] = i
+                            queues[i].put([X, Y])
+                            if(voteMap[Y][X] != 0):
+                                groupSize[i] += 1
+                                voteBalance[i] += voteMap[Y][X]
+                                newVoters += 1
+
+
+
+
+
+
+        # increment group number
+        i = (i + 1)%G
+    return map
 
 #map = PureRandomFloodfill(N, G)
 #map = BalancedRandomFloodfill(N, G, voteMap)
 #map = BalancedRandomFloodfillSkip(N, G, 100, voteMap)
 #map = StructuedFloodfill(N, G, pA, pB, voteMap)
 #map = RandomLinear(N, G, pA, pB, voteMap)
+#map = BiasedFloodfill(N, G, pA, pB, 10, voteMap)
 
 map = IterativeBRFS(100, N, G, 5, voteMap)
 
@@ -669,8 +802,9 @@ for i in range(G):
     if(voteCount[i] < 0):
         b += 1
 
-print('groupSize = ', groupSize)
+#print('groupSize = ', groupSize)
 print('groupPopulation = ', groupPopulation)
+print('stdev = ', np.std(groupPopulation))
 print('voteCount = ', voteCount)
 print('Red wins: ', b, '\nBlue wins: ', a)
 
