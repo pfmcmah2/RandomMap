@@ -39,13 +39,15 @@ N = 100
 G = 20
 groupSize = []
 numSquares = N*N
-pA = .2
+pA = .4
 pB = .4
 
 
 # create map of voters
-voteMap = oM.RandomShuffleControlledCluster(N, pA, pB, 100, 200)
-
+# voteMap = oM.RandomShuffleControlledCluster(N, pA, pB, 100, 200)
+Map = oM.RSCC_Stacking(N, pA, pB, 5, 2)
+voteMap = Map[0]
+pMap = Map[1]
 
 
 
@@ -250,17 +252,18 @@ def BalancedRandomFloodfill(N, G, voteMap):
 # goes until all queues have been emptied
 # skips expansion if group is larger than average
 # only skips a certain number of times in a row to avoid hang
-def BalancedRandomFloodfillSkip(N, G, maxSkip, voteMap):
+# takes in populationMap instead of voteMap, built to be used with RSCC_Stacking
+def BalancedRandomFloodfillSkip(N, G, maxSkip, populationMap):
     # initialize
     # TODO: Test Different maxSkip values increasing maxSkip should decrease stdev of group size
     # Not sure if there is a way to guarentee an upper bound on stdev size
     # maxSkip;  max number of turns than can be skipped for a group
     skip = [0 for i in range(G)]    # number of turns which have been skipped for each
+    groupSize = [0 for i in range(G)]
     queues = []
     for i in range(G):
         #val = round(numSquares/(G - i))
         #numSquares -= val
-        groupSize.append(1) # each group is initialized with one point on the map
         q = queue.Queue()
         queues.append(q)
 
@@ -288,9 +291,8 @@ def BalancedRandomFloodfillSkip(N, G, maxSkip, voteMap):
     totalVoters = G # total number of voters, updated after each round
     # check if start point is populated, if not fix values
     for i in range(G):
-        if(voteMap[startLocation[i][1]][startLocation[i][0]] == 0):
-            totalVoters -= 1
-            groupSize[i] = 0
+        totalVoters -= populationMap[startLocation[i][1]][startLocation[i][0]]
+        groupSize[i] = populationMap[startLocation[i][1]][startLocation[i][0]]
 
     while(numDone < G):
         if(i == 0):
@@ -324,33 +326,29 @@ def BalancedRandomFloodfillSkip(N, G, maxSkip, voteMap):
                     if(map[y+1][x] == -1):
                         map[y+1][x] = i
                         queues[i].put([x, y+1])
-                        if(voteMap[y+1][x] != 0): # if point on map is populted inc count
-                            groupSize[i] += 1
-                            newVoters += 1
+                        groupSize[i] += populationMap[y+1][x]
+                        newVoters += populationMap[y+1][x]
 
                 if(y > 0):
                     if(map[y-1][x] == -1):
                         map[y-1][x] = i
                         queues[i].put([x, y-1])
-                        if(voteMap[y-1][x] != 0):
-                            groupSize[i] += 1
-                            newVoters += 1
+                        groupSize[i] += populationMap[y-1][x]
+                        newVoters += populationMap[y-1][x]
 
                 if(x < N - 1):
                     if(map[y][x+1] == -1):
                         map[y][x+1] = i
                         queues[i].put([x+1, y])
-                        if(voteMap[y][x+1] != 0):
-                            groupSize[i] += 1
-                            newVoters += 1
+                        groupSize[i] += populationMap[y][x+1]
+                        newVoters += populationMap[y][x+1]
 
                 if(x > 0):
                     if(map[y][x-1] == -1):
                         map[y][x-1] = i
                         queues[i].put([x-1, y])
-                        if(voteMap[y][x-1] != 0):
-                            groupSize[i] += 1
-                            newVoters += 1
+                        groupSize[i] += populationMap[y][x-1]
+                        newVoters += populationMap[y][x-1]
 
         # increment group number
         i = (i + 1)%G
@@ -776,12 +774,13 @@ def BiasedFloodfill(N, G, pA, pB, maxSkip, voteMap):
 
 #map = PureRandomFloodfill(N, G)
 #map = BalancedRandomFloodfill(N, G, voteMap)
-#map = BalancedRandomFloodfillSkip(N, G, 100, voteMap)
+# changed for testing not working use BRFS_G
+#map = BalancedRandomFloodfillSkip(N, G, 100, pMap)
 #map = StructuedFloodfill(N, G, pA, pB, voteMap)
 #map = RandomLinear(N, G, pA, pB, voteMap)
 #map = BiasedFloodfill(N, G, pA, pB, 10, voteMap)
 
-map = IterativeBRFS(100, N, G, 5, voteMap)
+#map = IterativeBRFS(100, N, G, 5, voteMap)
 
 # count votes
 voteCount = [0 for x in range(G)]
