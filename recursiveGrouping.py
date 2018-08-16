@@ -12,10 +12,6 @@ pB = .4
 c = 100      # presence of clusters
 s = 50      # size of clusters
 
-maxSkip = 5     # number of consecutive times a group can be prevented from
-                # expanding during group creation, increasing increases runtime
-I = 10          # number of RandomMaps to be generated, increasing increases runtime
-                # but also increases chance of an even grouping
 MapType = 0     # Select type of voter map to be created
 
 ### BUILD RANDOM MAP ###
@@ -275,162 +271,43 @@ if(MapType == 1):
                     clusterSize += 1
 
 
-### CREATE GROUPS ###
-# creates a set of random groups using simultanous floodfills with random starting
-# points, scheduled to keep groups close in population size
-def RandomGroup(N, G, maxSkip, popMap):
-    # initialize
-    # TODO: Test Different maxSkip values increasing maxSkip should decrease stdev of group size
-    # Not sure if there is a way to guarentee an upper bound on stdev size
-    # maxSkip;  max number of turns than can be skipped for a group
-    skip = [0 for i in range(G)]    # number of turns which have been skipped for each
-    groupSize = [0 for i in range(G)]
-    queues = []
-    for i in range(G):
-        #val = round(numSquares/(G - i))
-        #numSquares -= val
-        q = queue.Queue()
-        queues.append(q)
-
-    # assign starting location for each group
-    startLocation = []      # used to check repeat start locations
-    for i in range(G):
-        repeat = True       # detect repeated start points
-        # expected number of tries = SUM(i = 0 to G - 1) (N^2 - 1)/N^2 ~ G for N >> G
-        # expected running time = SUM(i = 0 to G - 1) (i + 1)(N^2 - 1)/N^2 ~ G^2 for N >> G
-        while(repeat):
-            x = random.randint(0, N-1)
-            y = random.randint(0, N-1)
-            repeat = False
-            for j in range(i):
-                if(x == startLocation[j][0] and y == startLocation[j][1]):
-                    repeat = True
-        startLocation.append([x, y])
-        queues[i].put([x, y])
-
-    map = [[-1 for x in range(N)] for y in range(N)]
-    done = [0 for x in range(G)] # when queue is emptied mark as done
-    numDone = 0 # number of goups that are finished being filled
-    i = 0    # current group
-    newVoters = 0   # number of new voters in each round of expansion
-    totalVoters = G # total number of voters, updated after each round
-    # check if start point is populated, if not fix values
-    for i in range(G):
-        totalVoters -= popMap[startLocation[i][1]][startLocation[i][0]]
-        groupSize[i] = popMap[startLocation[i][1]][startLocation[i][0]]
-
-    while(numDone < G):
-        if(i == 0):
-            # compare size of each group to total voters at beginning of the round
-            # Otherwise this would give an advantage to higher index groups
-            totalVoters += newVoters
-            newVoters = 0
-
-        if(queues[i].empty()):
-            if(done[i] == 0):
-                done[i] = 1
-                numDone += 1
-        else:
-            expandFlag = True    # is the group allowed to expand this round
-            if(groupSize[i] > totalVoters/G):
-                skip[i] += 1    # increment skip count
-                if(skip[i] == maxSkip): # if max number of skips reach
-                    skip[i] = 0 # reset count and allow to expand
-                else:
-                    expandFlag = False
-
-            if(expandFlag):
-                point = queues[i].get()
-                x = point[0]
-                y = point[1]
 
 
-                # fill in surrounding elements
-                # filling in elements when added to queue, rather than when
-                if(y < N - 1):
-                    if(map[y+1][x] == -1):
-                        map[y+1][x] = i
-                        queues[i].put([x, y+1])
-                        groupSize[i] += popMap[y+1][x]
-                        newVoters += popMap[y+1][x]
+# recursively splits map unitl G even groups are created
 
-                if(y > 0):
-                    if(map[y-1][x] == -1):
-                        map[y-1][x] = i
-                        queues[i].put([x, y-1])
-                        groupSize[i] += popMap[y-1][x]
-                        newVoters += popMap[y-1][x]
-
-                if(x < N - 1):
-                    if(map[y][x+1] == -1):
-                        map[y][x+1] = i
-                        queues[i].put([x+1, y])
-                        groupSize[i] += popMap[y][x+1]
-                        newVoters += popMap[y][x+1]
-
-                if(x > 0):
-                    if(map[y][x-1] == -1):
-                        map[y][x-1] = i
-                        queues[i].put([x-1, y])
-                        groupSize[i] += popMap[y][x-1]
-                        newVoters += popMap[y][x-1]
-
-        # increment group number
-        i = (i + 1)%G
-    return [map, groupSize]
-
-# create I grouping and choose the one with the most evenly distributed population
-STD = N*N
-map = []
-for i in range(I):
-    tempMap = RandomGroup(N, G, maxSkip, PMap)
-    print(tempMap[1])
-    tempSTD = np.std(tempMap[1])    # take stdev of groupSize
-    print(tempSTD)
-    if(tempSTD < STD):
-        STD = tempSTD
-        map = tempMap[0]
+# start with everything in group 0
+map = [[0 for x in range(N)] for y in range(N)]
 
 
-### SHOW RESULTS ###
+population = math.ceil(N*N*pA) + math.ceil(N*N*pB)
+RecursiveGrouping(N, G, population, PMap, map, 0, [0,0], 0):
 
-voteCount = [0 for x in range(G)]
-groupPopulation = [0 for x in range(G)]
-for y in range(N):
-    for x in range(N):
-        idx = map[y][x] # get group index
-        voteCount[idx] += Map[y][x] # add vote
-        groupPopulation[idx] += PMap[y][x]
 
-# count groups won
-a = 0
-b = 0
-for i in range(G):
-    if(voteCount[i] > 0):
-        a += 1
-    if(voteCount[i] < 0):
-        b += 1
+# G = number of groups the input map needs to be split into
+# pop = population of input map
+# popMap = holds population for the voter map which was randomly generated
+# map = map of groupings
+# currGroup = map indexes with this value are considered to be the
+def RecursiveGrouping(G, pop, popMap, map, currGroup, startIdx, mode):
+    if(G > 1):
+        # the map will be split into 2 connected sub maps the first will contain G1 groupSize
+        # the second will contain G2 groups
+        G1 = round(G/2)
+        G2 = G - G1
+        # Target population of subgroup 1
+        quota1 = pop*G1/G
+        pop1 = 0
 
-#print('groupSize = ', groupSize)
-print('groupPopulation = ', groupPopulation)
-print('stdev = ', np.std(groupPopulation))
-print('voteCount = ', voteCount)
-print('Red wins: ', b, '\nBlue wins: ', a)
+        # horizontal linear group creation
+        ### TODO: Don't do linear, do random floodfill and have smaller group
+        # eat the larger
+        # check reachability of eaten group and if not reachable create a bridge?
+        # problem I am trying to solve: Given a connected graph G with weighted
+        # vertices find two connected subgraphs G1 and G2 such that the difference
+        # in the sum of the weights of the verices for each subgraph is minimized
+        # Can this be modeled as a DAG with 
+        if(mode == 0):
+            while()
 
-x = np.arange(0, N, 1)
-y = np.arange(0, N, 1)
-x, y = np.meshgrid(x, y)
-cMap = colors.ListedColormap(['red', 'white', 'blue'])
 
-# show vote map
-if(MapType == 0):
-    plt.pcolormesh(x, y, Map, cmap = cMap)
-if(MapType == 1):
-    plt.pcolormesh(x, y, Map)
-plt.colorbar()
-plt.show()
-
-# show groups
-plt.pcolormesh(x, y, map) #, cmap = cMap)
-plt.colorbar()
-plt.show()
+    # if G == 1, base case do nothing
